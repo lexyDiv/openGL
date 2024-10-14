@@ -1,5 +1,5 @@
 // g++ main.cpp ./src/glad.c -I./include -o program `sdl2-config --cflags --libs` -lSDL2 -lSDL2_mixer -lSDL2_image -lSDL2_ttf -I./GLM/
-// mike-one-obj
+// mike-multi-objs
 #include "body/camera/Camera.cpp"
 
 /////////////////////////////////
