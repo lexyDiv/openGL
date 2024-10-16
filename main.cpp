@@ -2,24 +2,6 @@
 // mike-multi-objs
 #include "body/camera/Camera.cpp"
 
-/////////////////////////////////
-// std::string gVertexShaderSource =
-//     "#version 410 core\n"
-//     "in vec4 position;\n"
-//     "void main()\n"
-//     "{\n"
-//     "   gl_Position = vec4(position.x, position.y, position.z, position.w);\n"
-//     "}\n";
-
-// std::string gFragmentShaderSource =
-//     "#version 410 core\n"
-//     "out vec4 color;\n"
-//     "void main()\n"
-//     "{\n"
-//     "   color = vec4(1.0f, 0.5f, 0.0f, 1.0f);\n"
-//     "}\n";
-
-///////////////////////////
 std::string LoadShaderAsString(std::string &fileName)
 {
     std::string resault = "";
@@ -46,18 +28,26 @@ SDL_Window *window = nullptr;
 SDL_GLContext ctxOGL = nullptr;
 bool quit = false;
 
-// VAO
-GLuint gVertexArrayObj = 0; // object vertex arrey
-// VBO
-GLuint gVertexBufferObj = 0;
-GLuint gIndexBufferObj = 0; // obj index buffer
-// GLuint gVertexBufferObj2 = 0;
+struct Mesh3D
+{
 
-float g_uOffset = -2.0f;
-float g_uOffsetYrot = 0.0f;
-float g_uOffsetScale = 0.5f;
+    // VAO
+    GLuint vertexArrayObj = 0; // object vertex arrey
+    // VBO
+    GLuint vertexBufferObj = 0;
+    GLuint indexBufferObj = 0; // obj index buffer
+                                // GLuint gVertexBufferObj2 = 0;
+    GLuint pipeline = 0;
+
+    float uOffset = -2.0f;
+    float uOffsetYrot = 0.0f;
+    float uOffsetScale = 0.5f;
+};
 
 Camera camera;
+
+Mesh3D mesh1;
+// Mesh3D mesh2;
 
 // ------------ errer -------------------
 static void GLClearAllErrors()
@@ -137,7 +127,7 @@ void GetOpenGLVersionInfo()
     std::cout << "shading lang" << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
 };
 
-void VertexSpec()
+void MeshCreate(Mesh3D* mesh1)
 {
     // on the CPU !!
     std::vector<GLfloat> vertexData{
@@ -171,18 +161,18 @@ void VertexSpec()
     const std::vector<GLuint> indexBufferData{
         2, 0, 1, 3, 2, 1};
 
-    glGenVertexArrays(1, &gVertexArrayObj);
-    glBindVertexArray(gVertexArrayObj);
-    glGenBuffers(1, &gVertexBufferObj);
-    glBindBuffer(GL_ARRAY_BUFFER, gVertexBufferObj);
+    glGenVertexArrays(1, &mesh1->vertexArrayObj);
+    glBindVertexArray(mesh1->vertexArrayObj);
+    glGenBuffers(1, &mesh1->vertexBufferObj);
+    glBindBuffer(GL_ARRAY_BUFFER, mesh1->vertexBufferObj);
     glBufferData(GL_ARRAY_BUFFER,
                  vertexData.size() * sizeof(GLfloat),
                  vertexData.data(),
                  GL_STATIC_DRAW);
 
     // create INDEX buffer (quatro)
-    glGenBuffers(1, &gIndexBufferObj);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gIndexBufferObj);
+    glGenBuffers(1, &mesh1->indexBufferObj);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh1->indexBufferObj);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                  indexBufferData.size() * sizeof(GLuint),
                  indexBufferData.data(),
@@ -248,18 +238,19 @@ void Initialize()
 
 void Input()
 {
-  static float mouseX = width / 2;
-  static float mouseY = height / 2;
+    static float mouseX = width / 2;
+    static float mouseY = height / 2;
 
     SDL_Event e;
     while (SDL_PollEvent(&e) != 0)
     {
-        if (e.type == SDL_QUIT) 
+        if (e.type == SDL_QUIT)
         {
             std::cout << "by by!" << std::endl;
             quit = true;
         }
-         if(e.type == SDL_MOUSEMOTION) {
+        if (e.type == SDL_MOUSEMOTION)
+        {
             mouseX += e.motion.xrel;
             mouseY += e.motion.yrel;
             camera.MouseLook(mouseX, mouseY);
@@ -270,30 +261,30 @@ void Input()
     if (state[SDL_SCANCODE_UP])
     {
         camera.moveForvard(0.1f);
-       // g_uOffset += 0.01f;
+        // g_uOffset += 0.01f;
         // std::cout << "UP" << std::endl;
     }
     if (state[SDL_SCANCODE_DOWN])
     {
         camera.moveBack(0.1f);
-       // g_uOffset -= 0.01f;
+        // g_uOffset -= 0.01f;
         //  std::cout << "DOWN" << std::endl;
     }
-        if (state[SDL_SCANCODE_LEFT])
+    if (state[SDL_SCANCODE_LEFT])
     {
         camera.moveLeft(0.1f);
-       // g_uOffsetYrot -= 0.1f;
+        // g_uOffsetYrot -= 0.1f;
         //  std::cout << "DOWN" << std::endl;
     }
-            if (state[SDL_SCANCODE_RIGHT])
+    if (state[SDL_SCANCODE_RIGHT])
     {
         camera.moveRight(0.1f);
-       // g_uOffsetYrot += 0.1f;
+        // g_uOffsetYrot += 0.1f;
         //  std::cout << "DOWN" << std::endl;
     }
 };
 
-void PreDraw()
+void MeshUpdate(Mesh3D* mesh, GLuint pipeline)
 {
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
@@ -301,37 +292,36 @@ void PreDraw()
     glViewport(0, 0, width, height);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-    glUseProgram(gGraphicsPipelineShaderProg);
-
+   // glUseProgram(gGraphicsPipelineShaderProg);
 
     // move
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, g_uOffset));
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, mesh->uOffset));
 
-    model = glm::rotate(model, glm::radians(g_uOffsetYrot), glm::vec3(0.0f, 1.0f, 0.0f));
-    model = glm::scale(model, glm::vec3(g_uOffsetScale, g_uOffsetScale, g_uOffsetScale));
+    model = glm::rotate(model, glm::radians(mesh->uOffsetYrot), glm::vec3(0.0f, 1.0f, 0.0f));
 
-    GLint u_ModelMetrixLocation = glGetUniformLocation(gGraphicsPipelineShaderProg, "u_ModelMatrix");
+    model = glm::scale(model, glm::vec3(mesh->uOffsetScale, mesh->uOffsetScale, mesh->uOffsetScale));
+
+    GLint u_ModelMetrixLocation = glGetUniformLocation(pipeline, "u_ModelMatrix");
     glUniformMatrix4fv(u_ModelMetrixLocation, 1, false, &model[0][0]);
 
-     
-     glm::mat4 view = camera.GetViewMatrix();
-    GLint viewLocation = glGetUniformLocation(gGraphicsPipelineShaderProg, "u_ViewMatrix");
+    glm::mat4 view = camera.GetViewMatrix();
+    GLint viewLocation = glGetUniformLocation(pipeline, "u_ViewMatrix");
     glUniformMatrix4fv(viewLocation, 1, false, &view[0][0]);
-     
+
     // poection matrix
     glm::mat4 perspective = glm::perspective(
         glm::radians(45.0f),
         (float)width / (float)height,
         0.1f,
         10.0f);
-    GLint u_PerspectiveLocation = glGetUniformLocation(gGraphicsPipelineShaderProg, "u_Perspective");
+    GLint u_PerspectiveLocation = glGetUniformLocation(pipeline, "u_Perspective");
     glUniformMatrix4fv(u_PerspectiveLocation, 1, false, &perspective[0][0]);
 };
 
-void Draw()
+void Draw(Mesh3D* mesh, GLuint pipeline)
 {
-    glBindVertexArray(gVertexArrayObj);
-
+    glBindVertexArray(mesh->vertexArrayObj);
+    glUseProgram(pipeline);
     //  glDrawArrays(GL_TRIANGLES, 0, 6);
     // GLCheck(
     glDrawElements(
@@ -340,6 +330,7 @@ void Draw()
         GL_UNSIGNED_INT,
         0);
     //  );
+   
 };
 
 void MainLoop()
@@ -349,8 +340,8 @@ void MainLoop()
     while (!quit)
     {
         Input();
-        PreDraw();
-        Draw();
+        MeshUpdate(&mesh1, gGraphicsPipelineShaderProg);
+        Draw(&mesh1, gGraphicsPipelineShaderProg);
         SDL_GL_SwapWindow(window); // updarte screen
     }
 };
@@ -404,7 +395,7 @@ int main()
     //    std::cout << "norm-b : " << glm::to_string(glm::normalize(B)) << std::endl;
     ////////////////////////////////////
     Initialize();
-    VertexSpec();
+    MeshCreate(&mesh1);
     createGraphicPipeline();
     MainLoop();
     CleanUp();
